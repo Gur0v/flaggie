@@ -74,25 +74,11 @@ def find_config_files(config_root: Path, token_type: TokenType) -> list[Path]:
 
     path = config_root / "etc/portage" / CONFIG_FILENAMES[token_type]
 
-    # if it's an existing directory, find the last visible file
-    # in the directory (provided there is any)
+    # if it's an existing directory, always use the local override file
+    # and leave sibling files untouched
     if path.is_dir():
-        def _is_visible(fn: str) -> bool:
-            return not fn.startswith(".") and not fn.endswith("~")
-
-        # yes, Portage is insane
-        def _get_all_paths_recursively(topdir: Path
-                                       ) -> typing.Generator[Path, None, None]:
-            for curpath, dirnames, filenames in os.walk(path):
-                dirnames = list(filter(_is_visible, dirnames))
-                for f in filter(_is_visible, filenames):
-                    yield Path(curpath) / f
-
-        all_files = sorted(_get_all_paths_recursively(path))
-        if all_files:
-            return all_files
         path /= "99local.conf"
-        path.touch()
+        path.touch(exist_ok=True)
         return [path]
 
     # if it does not exist yet, create a new directory and put a `local.conf`

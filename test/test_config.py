@@ -17,13 +17,16 @@ from flaggie.config import (TokenType, ConfigLine, find_config_files,
     "layout,expected",
     [([], ["package.use/99local.conf"]),
      (["package.use"], None),
-     (["package.use/a.conf", "package.use/b.conf"], None),
-     (["package.use/a/foo.conf", "package.use/b/foo.conf"], None),
+     (["package.use/a.conf", "package.use/b.conf"],
+      ["package.use/99local.conf"]),
+     (["package.use/a/foo.conf", "package.use/b/foo.conf"],
+      ["package.use/99local.conf"]),
      # even though "a+" sorts before "a/", directories take precedence
-     (["package.use/a/foo.conf", "package.use/a+"], None),
-     # hidden and backup files should be ignored
+     (["package.use/a/foo.conf", "package.use/a+"],
+      ["package.use/99local.conf"]),
+     # hidden and backup files should be ignored, and local file forced
      (["package.use/.foo", "package.use/foo.conf", "package.use/foo.conf~"],
-      ["package.use/foo.conf"]),
+      ["package.use/99local.conf"]),
      # corner case: package.use yielding no valid files
      (["package.use/.foo"], ["package.use/99local.conf"]),
      ])
