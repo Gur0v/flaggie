@@ -238,7 +238,7 @@ def main(prog_name: str, *argv: str) -> int:
     argp.add_argument("--version",
                       action="version",
                       help="Print program version and exit",
-                      version=f"flaggie {__version__}")
+                      version=f"flaggie (Gurov's version) {__version__}")
     args, request = argp.parse_known_args(argv)
 
     if args.debug:
