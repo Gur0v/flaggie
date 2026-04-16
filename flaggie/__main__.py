@@ -4,6 +4,7 @@
 import argparse
 import functools
 import logging
+import os
 import os.path
 import shlex
 import shutil
@@ -142,6 +143,8 @@ can either be a USE_EXPAND name or one of the special values:
   use::               package.use entries
 """
 
+AUTO_ELEVATE_ENV = "FLAGGER_ALREADY_ELEVATED"
+
 
 def guess_token_type(argp: argparse.ArgumentParser,
                      pm: typing.Optional["gentoopm.BasePM"],
@@ -176,6 +179,44 @@ def guess_token_type(argp: argparse.ArgumentParser,
                    f"{', '.join(names)}; pass e.g. {names[0]}::{flag} to "
                    f"disambiguate (for packages: {packages})")
     return next(iter(matched_types))[0]
+
+
+def get_requested_config_root(argv: list[str]) -> Path:
+    config_root = Path("/")
+    for pos, arg in enumerate(argv):
+        if arg == "--config-root" and pos + 1 < len(argv):
+            config_root = Path(argv[pos + 1])
+        elif arg.startswith("--config-root="):
+            config_root = Path(arg.split("=", 1)[1])
+    return config_root
+
+
+def should_auto_elevate(argv: list[str]) -> bool:
+    if os.geteuid() == 0:
+        return False
+    if os.environ.get(AUTO_ELEVATE_ENV) == "1":
+        return False
+    if any(arg in ("--help", "--version") for arg in argv):
+        return False
+    return get_requested_config_root(argv) == Path("/")
+
+
+def reexec_with_privileges(prog_name: str, argv: list[str]) -> None:
+    if not should_auto_elevate(argv):
+        return
+
+    helper = next((cmd for cmd in ("doas", "sudo") if shutil.which(cmd)), None)
+    if helper is None:
+        return
+
+    if os.sep in prog_name:
+        command = os.path.abspath(prog_name)
+    else:
+        command = shutil.which(prog_name) or prog_name
+
+    env = dict(os.environ)
+    env[AUTO_ELEVATE_ENV] = "1"
+    os.execvpe(helper, [helper, command, *argv], env)
 
 
 def main(prog_name: str, *argv: str) -> int:
@@ -352,6 +393,8 @@ def main(prog_name: str, *argv: str) -> int:
 
 
 def entry_point() -> None:
+    reexec_with_privileges(sys.argv[0], list(sys.argv[1:]))
+
     try:
         from rich.logging import RichHandler
     except ImportError:

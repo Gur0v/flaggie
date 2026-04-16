@@ -9,6 +9,8 @@ import pytest
 
 from flaggie.__main__ import (split_arg_sets, split_op,
                               namespace_into_token_group, main,
+                              get_requested_config_root,
+                              should_auto_elevate,
                               )
 from flaggie.config import TokenType
 
@@ -61,6 +63,42 @@ def test_split_op(op, expected):
      ])
 def test_namespace_into_token_group(arg, expected):
     assert namespace_into_token_group(arg) == expected
+
+
+@pytest.mark.parametrize(
+    "args,expected",
+    [([], "/"),
+     (["--config-root", "/tmp/root"], "/tmp/root"),
+     (["--config-root=/tmp/root"], "/tmp/root"),
+     (["--config-root", "/tmp/root", "pkg", "+flag"], "/tmp/root"),
+     ])
+def test_get_requested_config_root(args, expected):
+    assert str(get_requested_config_root(args)) == expected
+
+
+def test_should_auto_elevate_default_root(monkeypatch):
+    monkeypatch.setattr("os.geteuid", lambda: 1000)
+    monkeypatch.delenv("FLAGGER_ALREADY_ELEVATED", raising=False)
+    assert should_auto_elevate(["pipewire", "+sound-server"])
+
+
+def test_should_auto_elevate_skip_for_root(monkeypatch):
+    monkeypatch.setattr("os.geteuid", lambda: 0)
+    monkeypatch.delenv("FLAGGER_ALREADY_ELEVATED", raising=False)
+    assert not should_auto_elevate(["pipewire", "+sound-server"])
+
+
+def test_should_auto_elevate_skip_for_help(monkeypatch):
+    monkeypatch.setattr("os.geteuid", lambda: 1000)
+    monkeypatch.delenv("FLAGGER_ALREADY_ELEVATED", raising=False)
+    assert not should_auto_elevate(["--help"])
+
+
+def test_should_auto_elevate_skip_for_custom_root(monkeypatch):
+    monkeypatch.setattr("os.geteuid", lambda: 1000)
+    monkeypatch.delenv("FLAGGER_ALREADY_ELEVATED", raising=False)
+    assert not should_auto_elevate(
+        ["--config-root", "/tmp/root", "pipewire", "+sound-server"])
 
 
 def test_main_falls_back_when_package_manager_init_fails(tmp_path,
