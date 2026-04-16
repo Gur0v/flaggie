@@ -19,6 +19,45 @@ What stays same:
 - direct file configs like `package.use` still work as before
 - if `99local.conf` does not exist yet, this fork creates it
 
+Setup on Gentoo:
+
+1. Install `uv`:
+
+   ```bash
+   sudo emerge -av dev-python/uv
+   ```
+
+2. Install this fork as isolated tool, with `gentoopm` support:
+
+   ```bash
+   cd ~/flaggie
+   uv tool install --with gentoopm .
+   ```
+
+3. If `flaggie` is not found, add local bin dir to `PATH`:
+
+   ```bash
+   export PATH="$HOME/.local/bin:$PATH"
+   ```
+
+4. Verify install:
+
+   ```bash
+   flaggie --version
+   flaggie --help
+   ```
+
+Notes:
+
+- `uv tool install` gives global `flaggie` command without tying usage to repo
+  shell or local `venv`
+- after changing local source and wanting installed command updated, run:
+
+  ```bash
+  cd ~/flaggie
+  uv tool install --force --with gentoopm .
+  ```
+
 Upstream project:
 
 - original project: <https://github.com/gentoo/flaggie>
