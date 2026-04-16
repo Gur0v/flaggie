@@ -1,115 +1,46 @@
 # flagger
 
-`flagger` is a Gentoo-focused fork of upstream `flaggie`.
+`flagger` is my fork of Gentoo's `flaggie`.
 
-It still edits Portage `package.*` config from the command line, but this fork
-is stricter, more predictable, and much nicer to use on a real Gentoo system.
+I wanted a version that behaves better on a real system:
 
-## What changed from upstream
+- if a `package.*` config is a directory, it only writes to `99local.conf`
+- it does not touch sibling files
+- it works nicely when installed with `uv`
+- it can auto-elevate with `doas` or `sudo` when writing to real
+  `/etc/portage`
 
-- user-facing project name is `flagger`
-- installed command is `flagger`
-- `--version` prints `flagger <version>`
-- when a `package.*` config is a directory, `flagger` writes only to
-  `99local.conf`
-- sibling config files are never edited
-- when installed with `uv`, `flagger` can still use system `gentoopm` for auto
-  type guessing
-- on real `/etc/portage` runs, `flagger` auto-reexecs itself through `doas` or
-  `sudo` if needed
-
-## Why this fork exists
-
-- keep machine-managed changes in one predictable file
-- avoid touching hand-maintained config fragments
-- make isolated installs work well on Gentoo
-- remove extra friction from normal day-to-day use
-
-## Install on Gentoo
-
-Install dependencies:
+## Install
 
 ```bash
 sudo emerge -av dev-python/uv app-portage/gentoopm
-```
-
-Install `flagger` from this checkout:
-
-```bash
 cd ~/flagger
 uv tool install --with gentoopm .
 ```
 
-If `flagger` is not in `PATH` yet:
+If needed:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Verify:
-
-```bash
-flagger --version
-flagger --help
-```
-
-## Update after local changes
-
-```bash
-cd ~/flagger
-uv tool install --force --with gentoopm .
-```
-
-## Normal usage
-
-You can usually just run it directly:
+## Use
 
 ```bash
 flagger pipewire +sound-server
 flagger pipewire +~amd64
 ```
 
-If you are operating on the real `/etc/portage`, `flagger` will invoke
-`doas` or `sudo` itself when needed. You do not need to start it with
-`sudo flagger ...`.
+If you are working on the real system config, `flagger` will call `doas` or
+`sudo` itself when needed.
 
-If you are working against another root, pass `--config-root` explicitly:
+To update after local changes:
 
 ```bash
-flagger --config-root /tmp/testroot pipewire +sound-server
+cd ~/flagger
+uv tool install --force --with gentoopm .
 ```
 
-## Directory behavior
-
-If Portage config uses directory layout, for example:
-
-```text
-/etc/portage/package.use/
-```
-
-`flagger` will:
-
-- create `99local.conf` if missing
-- read and write `99local.conf`
-- leave every sibling file alone
-
-This applies to other `package.*` directories too, such as:
-
-- `package.accept_keywords/`
-- `package.license/`
-- `package.properties/`
-- `package.accept_restrict/`
-- `package.env/`
-
-## Notes
-
-- internal Python module name is still `flaggie`
-- direct single-file configs like `/etc/portage/package.use` still work
-- if auto type guessing cannot determine a namespace, you can still force one
-  with forms like `+use::sound-server` or `+kw::~amd64`
-
-## Upstream
-
-Original project:
+Upstream `flaggie`:
 
 - <https://github.com/gentoo/flaggie>
