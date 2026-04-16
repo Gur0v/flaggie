@@ -41,7 +41,7 @@ def collapse(obj):
         for item in obj:
             out.extend(collapse(item))
         return out
-    return [obj]
+    return [str(obj)]
 
 
 req = json.loads(sys.argv[1])
@@ -170,9 +170,11 @@ class SubprocessPM:
         proc = subprocess.run(
             [self.python_executable, "-c", SYSTEM_GENTOOPM_HELPER,
              json.dumps(payload)],
-            check=True,
             capture_output=True,
             text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"System package manager helper failed: {proc.stderr.strip()}")
         return typing.cast(dict[str, typing.Any], json.loads(proc.stdout))
 
     @functools.cache
