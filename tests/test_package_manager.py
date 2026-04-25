@@ -4,7 +4,12 @@ import types
 
 import pytest
 
-from flagger.package_manager import MatchError, SubprocessPackageManager, match_package
+from flagger.package_manager import (
+    MatchError,
+    SubprocessPackageManager,
+    match_package,
+    validate_package_spec,
+)
 
 
 class MockPackageManager:
@@ -64,3 +69,13 @@ def test_match_package_subprocess_package_manager(monkeypatch):
     monkeypatch.setattr(package_manager, "match_package", lambda package_spec: "app-foo/bar")
     monkeypatch.setattr("flagger.package_manager.cached_package_manager", lambda: package_manager)
     assert match_package("bar") == "app-foo/bar"
+
+
+def test_validate_package_spec_repo_qualified_wildcard():
+    validate_package_spec("*/*::steam-overlay")
+
+
+@pytest.mark.parametrize("package_spec", ["app-foo/bar::", "bad repo::steam overlay", "app-foo//bar"])
+def test_validate_package_spec_invalid(package_spec):
+    with pytest.raises(ValueError):
+        validate_package_spec(package_spec)

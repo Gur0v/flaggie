@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import json
+import re
 import shutil
 import subprocess
 
@@ -14,6 +15,13 @@ from flagger.operations import is_wildcard_package
 
 class MatchError(RuntimeError):
     pass
+
+
+REPO_SEPARATOR = "::"
+PACKAGE_OPERATORS = ("<=", ">=", "=", "<", ">", "~")
+SHORT_PACKAGE_RE = re.compile(r"^[A-Za-z0-9+_.-]+$")
+ATOM_PART_RE = re.compile(r"^(?:\*|[A-Za-z0-9+_.-]+(?:\*?[A-Za-z0-9+_.-]*)*)$")
+REPO_RE = re.compile(r"^[A-Za-z0-9+_.-]+$")
 
 
 SYSTEM_GENTOOPM_HELPER = r"""
@@ -92,15 +100,49 @@ def cached_package_manager() -> Any | None:
     return get_package_manager()
 
 
+def split_package_components(package_spec: str) -> tuple[str, str | None]:
+    if REPO_SEPARATOR not in package_spec:
+        return package_spec, None
+    base, repo = package_spec.rsplit(REPO_SEPARATOR, 1)
+    return base, repo or None
+
+
+def strip_operator(package_spec: str) -> str:
+    for operator in PACKAGE_OPERATORS:
+        if package_spec.startswith(operator):
+            return package_spec[len(operator) :]
+    return package_spec
+
+
+def validate_package_spec(package_spec: str) -> None:
+    base, repo = split_package_components(package_spec)
+    if repo is not None and REPO_RE.fullmatch(repo) is None:
+        raise ValueError(f"{package_spec!r} is not a valid repo-qualified package spec")
+
+    atom = strip_operator(base)
+    if "/" not in atom:
+        if SHORT_PACKAGE_RE.fullmatch(atom) is None:
+            raise ValueError(f"{package_spec!r} is not a valid package spec")
+        return
+
+    if atom.count("/") != 1:
+        raise ValueError(f"{package_spec!r} is not a valid category/package spec")
+
+    category, name = atom.split("/", 1)
+    if not category or not name:
+        raise ValueError(f"{package_spec!r} is not a valid category/package spec")
+    if ATOM_PART_RE.fullmatch(category) is None or ATOM_PART_RE.fullmatch(name) is None:
+        raise ValueError(f"{package_spec!r} is not a valid category/package spec")
+
+
 def match_package(package_spec: str) -> str:
+    validate_package_spec(package_spec)
+
     if is_wildcard_package(package_spec):
-        if package_spec.count("/") != 1:
-            raise ValueError("Not a valid category/package spec")
         return package_spec
 
-    if "/" in package_spec:
-        if package_spec.count("/") != 1:
-            raise ValueError("Not a valid category/package spec")
+    base, repo = split_package_components(package_spec)
+    if "/" in strip_operator(base):
         return package_spec
 
     package_manager = cached_package_manager()
@@ -110,12 +152,14 @@ def match_package(package_spec: str) -> str:
         )
 
     if isinstance(package_manager, SubprocessPackageManager):
-        return package_manager.match_package(package_spec)
+        resolved = package_manager.match_package(base)
+        return f"{resolved}{REPO_SEPARATOR}{repo}" if repo is not None else resolved
 
-    parsed = package_manager.Atom(package_spec)
-    matches = {str(pkg.key) for pkg in package_manager.stack.filter(package_spec)}
+    parsed = package_manager.Atom(base)
+    matches = {str(pkg.key) for pkg in package_manager.stack.filter(base)}
     if not matches:
         raise MatchError(f"{package_spec!r} matched no packages")
     if len(matches) > 1:
         raise MatchError(f"{package_spec!r} is ambiguous, matched {', '.join(sorted(matches))}")
-    return package_spec.replace(str(parsed.key.package), next(iter(matches)))
+    resolved = base.replace(str(parsed.key.package), next(iter(matches)))
+    return f"{resolved}{REPO_SEPARATOR}{repo}" if repo is not None else resolved

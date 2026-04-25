@@ -50,8 +50,17 @@ def ensure_local_config(path: Path) -> Path:
     return path
 
 
-def find_config_files(config_root: Path, token_type: TokenType) -> list[Path]:
-    return [ensure_local_config(config_root / "etc/portage" / CONFIG_FILENAMES[token_type])]
+def resolve_config_path(path: Path, *, create: bool) -> Path:
+    if create:
+        return ensure_local_config(path)
+    if path.is_dir():
+        return path / LOCAL_CONFIG_NAME
+    return path
+
+
+def find_config_files(config_root: Path, token_type: TokenType, *, create: bool = True) -> list[Path]:
+    path = config_root / "etc/portage" / CONFIG_FILENAMES[token_type]
+    return [resolve_config_path(path, create=create)]
 
 
 def parse_config_lines(lines: list[str]) -> Generator[ConfigLine, None, None]:
@@ -83,6 +92,9 @@ def parse_config_lines(lines: list[str]) -> Generator[ConfigLine, None, None]:
 def read_config_files(paths: Iterable[Path]) -> Generator[ConfigFile, None, None]:
     for path in paths:
         logging.debug("Loading config file %s", path)
+        if not path.exists():
+            yield ConfigFile(path=path, parsed_lines=[])
+            continue
         with path.open("r") as handle:
             yield ConfigFile(path=path, parsed_lines=list(parse_config_lines(handle.readlines())))
 
@@ -97,6 +109,14 @@ def save_config_files(
 
         temp_path: Path | None = None
         try:
+            if config_file.path.is_dir() or (
+                not config_file.path.exists() and config_file.path.name in CONFIG_FILENAMES.values()
+            ):
+                config_file.path = ensure_local_config(config_file.path)
+            else:
+                config_file.path.parent.mkdir(parents=True, exist_ok=True)
+                if not config_file.path.exists():
+                    config_file.path.touch()
             with tempfile.NamedTemporaryFile(
                 mode="w",
                 dir=config_file.path.parent,

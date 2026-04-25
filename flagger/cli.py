@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 import os
+import shlex
 import shutil
+import sys
 import textwrap
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import Generator, Iterable
 
 from flagger import __version__
 from flagger.models import TokenType
@@ -46,6 +49,15 @@ Any other namespace is treated as a USE_EXPAND group name, e.g.
 """
 
 
+@dataclass(frozen=True)
+class ParsedCli:
+    pretend: bool
+    quiet: bool
+    json: bool
+    verbose: bool
+    request: list[str]
+
+
 def get_config_root() -> Path:
     return Path(os.environ.get(CONFIG_ROOT_ENV, "/"))
 
@@ -73,9 +85,31 @@ def build_parser(prog_name: str) -> argparse.ArgumentParser:
     )
     parser.add_argument("--help", action="help", help="Print help text and exit")
     parser.add_argument(
+        "--from-file",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="Read additional requests from PATH, or '-' for stdin",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print machine-readable JSON output",
+    )
+    parser.add_argument(
         "--pretend",
         action="store_true",
         help="Do not write any changes to the original files",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress success output",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print extra details about what flagger is doing",
     )
     parser.add_argument(
         "--version",
@@ -84,6 +118,36 @@ def build_parser(prog_name: str) -> argparse.ArgumentParser:
         help="Print program version and exit",
     )
     return parser
+
+
+def read_request_tokens(path: str) -> list[str]:
+    if path == "-":
+        content = sys.stdin.read()
+    else:
+        with open(path, "r") as handle:
+            content = handle.read()
+
+    tokens: list[str] = []
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        tokens.extend(shlex.split(line))
+    return tokens
+
+
+def parse_cli_args(parser: argparse.ArgumentParser, argv: list[str]) -> ParsedCli:
+    args, request = parser.parse_known_args(argv)
+    file_tokens: list[str] = []
+    for path in args.from_file:
+        file_tokens.extend(read_request_tokens(path))
+    return ParsedCli(
+        pretend=args.pretend,
+        quiet=args.quiet,
+        json=args.json,
+        verbose=args.verbose,
+        request=file_tokens + request,
+    )
 
 
 def split_arg_sets(

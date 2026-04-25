@@ -20,8 +20,17 @@ def main() -> None:
             raise AssertionError("Privilege re-exec unexpectedly returned")
         print(f"flagger: failed: {os.strerror(err.errno)}", file=sys.stderr)
         raise SystemExit(1) from err
+    except Exception as err:
+        print(f"flagger: failed: {err}", file=sys.stderr)
+        raise SystemExit(1) from err
 
-    print(result.message)
+    rendered = result.render(
+        quiet="--quiet" in argv,
+        json_output="--json" in argv,
+        verbose="--verbose" in argv,
+    )
+    if rendered:
+        print(rendered)
     raise SystemExit(0)
 
 

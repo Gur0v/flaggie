@@ -10,6 +10,8 @@ from flagger.cli import (
     get_config_root,
     infer_token_type,
     namespace_into_target,
+    parse_cli_args,
+    read_request_tokens,
     resolve_targets,
     split_arg_sets,
     split_operation,
@@ -80,3 +82,22 @@ def test_resolve_targets_remove_all():
         (TokenType.USE, None),
         (TokenType.KEYWORD, None),
     ]
+
+
+def test_read_request_tokens(tmp_path):
+    path = tmp_path / "requests.txt"
+    path.write_text("# comment\npkg +foo\n'*/ *'  \n")
+    assert read_request_tokens(str(path)) == ["pkg", "+foo", "*/ *"]
+
+
+def test_parse_cli_args_from_file(tmp_path):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--from-file", action="append", default=[])
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--pretend", action="store_true")
+    parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
+    path = tmp_path / "requests.txt"
+    path.write_text("pkg +foo\n")
+    parsed = parse_cli_args(parser, ["--from-file", str(path), "other", "+bar"])
+    assert parsed.request == ["pkg", "+foo", "other", "+bar"]

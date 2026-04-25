@@ -11,6 +11,7 @@ from flagger.config_files import (
     parse_config_lines,
     read_config_files,
     render_config_line,
+    resolve_config_path,
     save_config_files,
 )
 from flagger.models import ConfigFile, ConfigLine, TokenType
@@ -34,6 +35,21 @@ def test_find_config(token_type, layout, expected, tmp_path):
     if expected is None:
         expected = layout
     assert find_config_files(tmp_path, token_type) == [confdir / item for item in expected]
+
+
+def test_find_config_without_creating_files(tmp_path):
+    confdir = tmp_path / "etc/portage"
+    confdir.mkdir(parents=True)
+    expected = confdir / "package.use"
+    assert find_config_files(tmp_path, TokenType.USE, create=False) == [expected]
+    assert not expected.exists()
+
+
+def test_resolve_config_path_directory_without_creation(tmp_path):
+    path = tmp_path / "package.use"
+    path.mkdir()
+    assert resolve_config_path(path, create=False) == path / "99local.conf"
+    assert not (path / "99local.conf").exists()
 
 
 TEST_CONFIG_FILE = [
@@ -79,6 +95,11 @@ def test_read_config_files(tmp_path):
     ]
 
 
+def test_read_config_files_missing_path(tmp_path):
+    missing = tmp_path / "missing"
+    assert list(read_config_files([missing])) == [ConfigFile(missing, [])]
+
+
 def test_save_config_files_no_modification(tmp_path):
     config_files = [
         ConfigFile(tmp_path / "config", PARSED_TEST_CONFIG),
@@ -86,6 +107,16 @@ def test_save_config_files_no_modification(tmp_path):
     ]
     save_config_files(config_files)
     assert all(not config_file.path.exists() for config_file in config_files)
+
+
+def test_save_config_files_creates_missing_target(tmp_path):
+    config_file = ConfigFile(
+        tmp_path / "etc/portage/package.use/99local.conf",
+        [ConfigLine("dev-foo/bar", ["new"], [])],
+        modified=True,
+    )
+    save_config_files([config_file])
+    assert config_file.path.read_text() == "dev-foo/bar new\n"
 
 
 def invalidate_config_lines(lines: list[ConfigLine], *line_numbers: int) -> list[ConfigLine]:

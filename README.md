@@ -23,6 +23,9 @@ This version is deliberately narrower:
 * only escalates privileges when it actually needs to write
 * supports `sudo`, `sudo-rs`, `doas`, `run0`, and `pkexec`
 * keeps the original syntax, with optional `use::` and `kw::` namespaces
+* can read requests from a file or stdin
+* can print quiet, verbose, or JSON output
+* normalizes duplicate/conflicting requests and warns when it does
 
 If you want the full feature set of old `flaggie`, use `flaggie`.
 
@@ -37,11 +40,18 @@ uv tool install --with gentoopm .
 
 ## Usage
 
-There are only three flags:
+Core flags:
 
 * `--help`
 * `--version`
 * `--pretend`
+
+Output and input helpers:
+
+* `--quiet`
+* `--verbose`
+* `--json`
+* `--from-file PATH`
 
 Everything else is just operations:
 
@@ -50,6 +60,8 @@ flagger [options] [package ...] op [op ...]
 ```
 
 No package means `*/*`.
+
+`--from-file -` reads requests from stdin. Request files use one request per line, and lines starting with `#` are ignored.
 
 ### USE flags
 
@@ -79,6 +91,21 @@ Everything else goes to `package.use` unless you say otherwise.
 flagger --pretend media-video/pipewire +sound-server +~amd64
 ```
 
+### Output modes
+
+```bash
+flagger --verbose mesa +opencl
+flagger --json mesa +opencl
+flagger --quiet mesa +opencl
+printf '%s\n' "mesa +opencl" | flagger --from-file -
+```
+
+`--verbose` prints extra details like resolved short package names and touched files.
+
+`--json` prints machine-readable success output.
+
+If the same request contains duplicates or conflicts, `flagger` keeps the last one and prints a warning.
+
 ## Notes
 
 You can point `flagger` at another Portage root using `FLAGGER_CONFIG_ROOT`.
@@ -86,6 +113,21 @@ You can point `flagger` at another Portage root using `FLAGGER_CONFIG_ROOT`.
 On a real system, it tries to write first. If that fails with a `PermissionError`, it re-runs itself through the first available helper (`sudo`, `sudo-rs`, `doas`, `run0`, or `pkexec`).
 
 No guessing, no always-running-as-root.
+
+## Testing
+
+`uv`-first:
+
+```bash
+uv run --with pytest pytest -vv tests
+```
+
+`tox` still works too:
+
+```bash
+tox
+tox -e uv
+```
 
 ## Layout
 
