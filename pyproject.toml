@@ -4,38 +4,33 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "flagger"
-authors = [{name = "Michał Górny", email = "mgorny@gentoo.org"}]
+authors = [{name = "Gurov"}]
 license = {file = "COPYING"}
 classifiers = ["License :: OSI Approved :: MIT License"]
 dynamic = ["version", "description"]
 requires-python = ">=3.9"
-dependencies = [
-    "more-itertools",
-]
+dependencies = []
 
 [project.optional-dependencies]
 package-manager = [
     "gentoopm >= 0.5",
-]
-pretty-log = [
-    "rich",
 ]
 test = [
     "pytest",
 ]
 
 [project.scripts]
-flagger = "flaggie.__main__:entry_point"
+flagger = "flagger.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/Gur0v/flaggie/"
+Homepage = "https://github.com/Gur0v/flagger/"
 
 [tool.flit.module]
-name = "flaggie"
+name = "flagger"
 
 [tool.flit.sdist]
 include = [
-    "test",
+    "tests",
     "tox.ini",
 ]
 
@@ -45,21 +40,19 @@ no_implicit_optional = true
 
 [[tool.mypy.overrides]]
 module = [
-    "test.*",
+    "tests.*",
 ]
-# requiring explicit types for all test methods would be cumbersome
 disallow_untyped_defs = false
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = [
     "gentoopm.*",
-    "rich.*",
 ]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = "--log-level=debug"
 testpaths = [
-    "test",
+    "tests",
 ]
